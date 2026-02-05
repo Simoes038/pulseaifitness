@@ -1,0 +1,376 @@
+/* ============================================================================
+   BUTTON COMPONENT - Design System Integration
+   ========================================================================== */
+
+/* Base styles para todos os buttons */
+.button {
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  
+  /* Tamanho padrão (medium) */
+  padding: var(--space-8) var(--space-16);
+  min-height: 40px;
+  
+  /* Tipografia */
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-normal);
+  text-align: center;
+  letter-spacing: var(--letter-spacing-tight);
+  
+  /* Estilo */
+  border: none;
+  border-radius: var(--radius-base);
+  cursor: pointer;
+  position: relative;
+  
+  /* Transições */
+  transition: all var(--duration-normal) var(--ease-standard);
+  
+  /* Remove estilos default do navegador */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  
+  /* Foco acessível */
+  outline: none;
+}
+
+/* Quando o button está focado via teclado */
+.button:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}
+
+/* ============================================================================
+   VARIANTS (Colors)
+   ========================================================================== */
+
+/* Primary - Cor principal do design system */
+.button--primary {
+  background-color: var(--color-primary);
+  color: var(--color-btn-primary-text);
+  border: 1px solid var(--color-primary);
+}
+
+.button--primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  box-shadow: var(--shadow-md);
+}
+
+.button--primary:active:not(:disabled) {
+  background-color: var(--color-primary-active);
+  border-color: var(--color-primary-active);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Secondary - Cor secundária do design system */
+.button--secondary {
+  background-color: var(--color-secondary);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.button--secondary:hover:not(:disabled) {
+  background-color: var(--color-secondary-hover);
+  border-color: var(--color-border);
+}
+
+.button--secondary:active:not(:disabled) {
+  background-color: var(--color-secondary-active);
+  border-color: var(--color-border);
+}
+
+/* Danger - Para ações destrutivas */
+.button--danger {
+  background-color: var(--color-error);
+  color: var(--color-btn-primary-text);
+  border: 1px solid var(--color-error);
+}
+
+.button--danger:hover:not(:disabled) {
+  background-color: rgba(var(--color-error-rgb), 0.9);
+  border-color: rgba(var(--color-error-rgb), 0.9);
+  box-shadow: var(--shadow-md);
+}
+
+.button--danger:active:not(:disabled) {
+  background-color: rgba(var(--color-error-rgb), 0.8);
+  border-color: rgba(var(--color-error-rgb), 0.8);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Outline - Apenas borda */
+.button--outline {
+  background-color: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.button--outline:hover:not(:disabled) {
+  background-color: var(--color-secondary);
+  border-color: var(--color-border);
+}
+
+.button--outline:active:not(:disabled) {
+  background-color: var(--color-secondary-hover);
+  border-color: var(--color-border);
+}
+
+/* Ghost - Sem fundo, apenas texto */
+.button--ghost {
+  background-color: transparent;
+  color: var(--color-primary);
+  border: none;
+}
+
+.button--ghost:hover:not(:disabled) {
+  background-color: var(--color-secondary);
+  color: var(--color-primary-hover);
+}
+
+.button--ghost:active:not(:disabled) {
+  background-color: var(--color-secondary-hover);
+  color: var(--color-primary-active);
+}
+
+/* ============================================================================
+   SIZES (Responsive)
+   ========================================================================== */
+
+/* Small */
+.button--small {
+  padding: var(--space-4) var(--space-12);
+  font-size: var(--font-size-sm);
+  min-height: 32px;
+  border-radius: var(--radius-sm);
+  gap: var(--space-4);
+}
+
+/* Medium (padrão) */
+.button--medium {
+  padding: var(--space-8) var(--space-16);
+  font-size: var(--font-size-base);
+  min-height: 40px;
+  border-radius: var(--radius-base);
+  gap: var(--space-6);
+}
+
+/* Large */
+.button--large {
+  padding: var(--space-12) var(--space-20);
+  font-size: var(--font-size-lg);
+  min-height: 48px;
+  border-radius: var(--radius-md);
+  gap: var(--space-8);
+}
+
+/* ============================================================================
+   WIDTH
+   ========================================================================== */
+
+.button--full-width {
+  width: 100%;
+}
+
+/* ============================================================================
+   STATES
+   ========================================================================== */
+
+/* Disabled - Desabilitado */
+.button:disabled,
+.button--disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Loading - Em carregamento */
+.button--loading {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+/* ============================================================================
+   CONTENT STRUCTURE (Flex layout para ícones + texto)
+   ========================================================================== */
+
+.button__content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: inherit;
+  width: 100%;
+  height: 100%;
+}
+
+/* Icon styling */
+.button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+  
+  /* Dimensões dos ícones baseadas no tamanho do button */
+}
+
+/* Ícone pequeno */
+.button--small .button__icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
+/* Ícone médio */
+.button--medium .button__icon {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+}
+
+/* Ícone grande */
+.button--large .button__icon {
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
+}
+
+/* Ícone à esquerda */
+.button__icon--left {
+  margin-right: calc(var(--space-4) * -1);
+}
+
+/* Ícone à direita */
+.button__icon--right {
+  margin-left: calc(var(--space-4) * -1);
+}
+
+/* Text styling */
+.button__text {
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================================================
+   SPINNER/LOADING INDICATOR
+   ========================================================================== */
+
+.button__spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  opacity: 1;
+  animation: spinnerFadeIn var(--duration-fast) var(--ease-standard);
+}
+
+.button__spinner-dot {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background-color: currentColor;
+  animation: spinnerPulse var(--duration-normal) var(--ease-standard) infinite;
+}
+
+/* Tamanhos de spinner por tipo de button */
+.button--small .button__spinner-dot {
+  width: 3px;
+  height: 3px;
+}
+
+.button--medium .button__spinner-dot {
+  width: 4px;
+  height: 4px;
+}
+
+.button--large .button__spinner-dot {
+  width: 5px;
+  height: 5px;
+}
+
+/* Animações */
+@keyframes spinnerPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes spinnerFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ============================================================================
+   DARK MODE SUPPORT
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  .button--outline {
+    border-color: var(--color-border-secondary);
+  }
+  
+  .button--outline:hover:not(:disabled) {
+    border-color: var(--color-border-secondary);
+  }
+}
+
+/* Fallback para data-color-scheme */
+[data-color-scheme="dark"] .button--outline {
+  border-color: var(--color-border-secondary);
+}
+
+[data-color-scheme="dark"] .button--outline:hover:not(:disabled) {
+  border-color: var(--color-border-secondary);
+}
+
+/* ============================================================================
+   ACCESSIBILITY
+   ========================================================================== */
+
+/* Remove transições se preferir motion reduzido */
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .button__spinner-dot {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* Hover state para dispositivos que suportam */
+@media (hover: hover) {
+  .button:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+}
+
+/* ============================================================================
+   RESPONSIVE
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  .button {
+    font-size: var(--font-size-sm);
+  }
+  
+  .button--medium {
+    padding: var(--space-6) var(--space-12);
+    min-height: 36px;
+  }
+}
