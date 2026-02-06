@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import jwt from 'jsonwebtoken';
-import { dbGet } from '@/lib/db';
+import { dbGet } from '@/lib/supabase';
 import { generateNutritionResponse } from '@/lib/ai-service';
 
 export async function POST(request) {

@@ -1,4 +1,4 @@
-import { get } from '@/supabase';
+import { get } from '@/lib/supabase';
 
 export async function POST(request) {
   try {
