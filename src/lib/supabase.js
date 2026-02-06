@@ -110,3 +110,4 @@ export async function dbUpsert(table, values, onConflict) {
   if (error) throw error;
   return data;
 }
+console.log("ENV URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
