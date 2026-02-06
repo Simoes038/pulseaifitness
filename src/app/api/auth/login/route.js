@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { initializeDatabase, dbGet, dbRun } from "@/lib/db.js";
+import { supabaseAdmin } from "@/lib/supabase";
 
 // =============================
 // VALIDAÇÕES
@@ -25,9 +25,6 @@ export async function POST(request) {
   console.log("🚀 [LOGIN] Requisição recebida");
 
   try {
-    // garante que o banco está pronto
-    await initializeDatabase();
-
     const body = await request.json();
     const { email, password } = body || {};
 
@@ -62,13 +59,15 @@ export async function POST(request) {
 
     console.log("🔍 Buscando usuário:", normalizedEmail);
 
-    const user = await dbGet(
-      "SELECT id, email, password_hash, full_name FROM users WHERE email = ?",
-      [normalizedEmail]
-    );
+    // Buscar usuário no Supabase
+    const { data: user, error: fetchError } = await supabaseAdmin
+      .from("users")
+      .select("id, email, password_hash, full_name")
+      .eq("email", normalizedEmail)
+      .single();
 
-    // evita revelar se usuário existe
-    if (!user || !user.password_hash) {
+    // Evita revelar se usuário existe
+    if (fetchError || !user || !user.password_hash) {
       console.log("❌ Usuário não encontrado");
       return Response.json(
         { error: "Email ou senha incorretos" },
@@ -90,16 +89,18 @@ export async function POST(request) {
       );
     }
 
+    // Gerar token JWT
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       process.env.JWT_SECRET || "dev-secret",
       { expiresIn: "24h" }
     );
 
-    await dbRun(
-      "UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?",
-      [user.id]
-    );
+    // Atualizar last_login no Supabase
+    await supabaseAdmin
+      .from("users")
+      .update({ last_login: new Date().toISOString() })
+      .eq("id", user.id);
 
     console.log("🎉 Login realizado com sucesso!");
 

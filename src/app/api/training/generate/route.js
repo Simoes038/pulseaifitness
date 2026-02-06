@@ -1,6 +1,6 @@
 export const runtime = 'nodejs';
 
-import { dbGet, dbRun } from '@/lib/db';
+import { supabaseAdmin } from '@/lib/supabase';
 import jwt from 'jsonwebtoken';
 import { 
   generateTrainingWithGroq, 
@@ -30,10 +30,21 @@ export async function POST(request) {
     }
 
     const token = authHeader.substring(7);
-    let decoded;
+    let userId;
+    
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
-      console.log(`[TRAINING-GENERATE] ✅ Token válido para usuário: ${decoded.userId}`);
+      // Tentar verificar com Supabase primeiro
+      const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+      
+      if (error || !user) {
+        // Fallback para JWT customizado (se ainda estiver em transição)
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
+        userId = decoded.userId;
+        console.log(`[TRAINING-GENERATE] ✅ Token JWT customizado válido: ${userId}`);
+      } else {
+        userId = user.id;
+        console.log(`[TRAINING-GENERATE] ✅ Token Supabase válido: ${userId}`);
+      }
     } catch (err) {
       console.error('[TRAINING-GENERATE] ❌ Token inválido:', err.message);
       return Response.json(
@@ -41,8 +52,6 @@ export async function POST(request) {
         { status: 401 }
       );
     }
-
-    const userId = decoded.userId;
 
     // ===== 2. PARSEAR DADOS DO FORMULÁRIO =====
     console.log('[TRAINING-GENERATE] Recebendo dados do formulário...');
@@ -98,7 +107,7 @@ export async function POST(request) {
     console.log('[TRAINING-GENERATE] Normalizando estrutura do treino...');
     const diasSemana = parseInt(formData.diasSemana);
     const normalizedTraining = {
-      diasSemana: diasSemana, // ✅ CAMPO NOVO: número exato de dias
+      diasSemana: diasSemana,
       current_day: 1,
       user_preferences: {
         altura: formData.altura,
@@ -110,10 +119,10 @@ export async function POST(request) {
         tempoDiario: formData.tempoDiario,
         generated_at: new Date().toISOString()
       },
-      plan: {} // ✅ CAMPO NOVO: objeto com todos os dias
+      plan: {}
     };
 
-    // Normalizar dias gerados pela IA para o formato correto
+    // Normalizar dias gerados pela IA
     for (let dia = 1; dia <= diasSemana; dia++) {
       const diaKey = `dia${dia}_exercises`;
       normalizedTraining.plan[dia] = trainingResult[diaKey] || [];
@@ -122,106 +131,58 @@ export async function POST(request) {
 
     console.log(`[TRAINING-GENERATE] ✅ Treino normalizado para ${diasSemana} dias`);
 
-    // ===== 6. SALVAR NO BANCO DE DADOS =====
-    console.log('[TRAINING-GENERATE] Salvando treino no banco de dados...');
+    // ===== 6. SALVAR NO SUPABASE =====
+    console.log('[TRAINING-GENERATE] Salvando treino no Supabase...');
     
-    // Verificar se já existe treino
-    const existingTraining = await dbGet(
-      'SELECT id FROM training WHERE user_id = ? LIMIT 1',
-      [userId]
-    );
+    // Preparar dados para upsert
+    const trainingData = {
+      user_id: userId,
+      current_day: 1,
+      dias_semana: diasSemana,
+      generated_at: new Date().toISOString(),
+      user_preferences: normalizedTraining.user_preferences,
+      ai_model: 'groq'
+    };
 
-    // Preparar dados para salvar (só os dias necessários)
-    const dayFields = {};
+    // Adicionar campos de dias
     for (let dia = 1; dia <= diasSemana; dia++) {
-      dayFields[`day${dia}_exercises`] = JSON.stringify(normalizedTraining.plan[dia] || []);
-    }
-    dayFields.current_day = 1;
-    dayFields.diasSemana = diasSemana; // ✅ CAMPO NOVO NO BANCO
-    dayFields.generated_at = new Date().toISOString();
-    dayFields.user_preferences = JSON.stringify(normalizedTraining.user_preferences);
-    dayFields.ai_model = 'groq';
-
-    if (existingTraining) {
-      console.log('[TRAINING-GENERATE] Atualizando treino existente...');
-      
-      // UPDATE dinâmico baseado nos dias
-      let updateQuery = 'UPDATE training SET ';
-      const updateValues = [];
-      
-      updateQuery += 'current_day = ?, diasSemana = ?, generated_at = ?, ';
-      updateValues.push(1, diasSemana, new Date().toISOString());
-      
-      // Adicionar campos de dias
-      for (let dia = 1; dia <= diasSemana; dia++) {
-        updateQuery += `day${dia}_exercises = ?, `;
-        updateValues.push(JSON.stringify(normalizedTraining.plan[dia] || []));
-      }
-      
-      // Campos fixos
-      updateQuery += 'user_preferences = ?, ai_model = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?';
-      updateValues.push(
-        JSON.stringify(normalizedTraining.user_preferences),
-        'groq',
-        userId
-      );
-
-      await dbRun(updateQuery, updateValues);
-    } else {
-      console.log('[TRAINING-GENERATE] Criando novo treino...');
-      
-      // INSERT dinâmico
-      let insertQuery = 'INSERT INTO training (user_id, ';
-      const insertValues = [userId];
-      
-      insertQuery += 'current_day, diasSemana, ';
-      insertValues.push(1, diasSemana);
-      
-      // Campos de dias
-      for (let dia = 1; dia <= diasSemana; dia++) {
-        insertQuery += `day${dia}_exercises, `;
-        insertValues.push(JSON.stringify(normalizedTraining.plan[dia] || []));
-      }
-      
-      // Campos fixos
-      insertQuery += 'generated_at, user_preferences, ai_model) VALUES (';
-      insertValues.push(new Date().toISOString());
-      insertValues.push(JSON.stringify(normalizedTraining.user_preferences));
-      insertValues.push('groq');
-      
-      insertQuery += insertValues.slice(1).map(() => '?').join(',') + ')';
-
-      await dbRun(insertQuery, insertValues);
-    }
-    console.log('[TRAINING-GENERATE] ✅ Treino salvo no banco com sucesso');
-
-    // ===== 7. BUSCAR TREINO COMPLETO PARA RETORNAR =====
-    console.log('[TRAINING-GENERATE] Buscando treino completo...');
-    const training = await dbGet(
-      'SELECT * FROM training WHERE user_id = ? LIMIT 1',
-      [userId]
-    );
-
-    if (!training) {
-      console.error('[TRAINING-GENERATE] ❌ Treino não encontrado após salvar');
-      return Response.json(
-        { error: 'Erro ao recuperar treino', code: 'TRAINING_NOT_FOUND' },
-        { status: 500 }
-      );
+      trainingData[`day${dia}_exercises`] = normalizedTraining.plan[dia] || [];
     }
 
-    // ===== 8. FORMATAR RESPOSTA =====
+    // Limpar dias não utilizados (se estava 7 dias e agora é 5, limpar 6 e 7)
+    for (let dia = diasSemana + 1; dia <= 7; dia++) {
+      trainingData[`day${dia}_exercises`] = null;
+    }
+
+    // Upsert (insert ou update)
+    const { data: savedTraining, error: upsertError } = await supabaseAdmin
+      .from('training')
+      .upsert(trainingData, {
+        onConflict: 'user_id',
+        returning: 'representation'
+      })
+      .select()
+      .single();
+
+    if (upsertError) {
+      console.error('[TRAINING-GENERATE] ❌ Erro ao salvar:', upsertError);
+      throw new Error(`Erro ao salvar treino: ${upsertError.message}`);
+    }
+
+    console.log('[TRAINING-GENERATE] ✅ Treino salvo no Supabase com sucesso');
+
+    // ===== 7. FORMATAR RESPOSTA =====
     const response = {
       success: true,
       training: {
-        id: training.id,
-        user_id: training.user_id,
-        diasSemana: training.diasSemana, // ✅ CAMPO NOVO
-        current_day: 1,
-        generated_at: training.generated_at,
-        ai_model: training.ai_model,
-        user_preferences: training.user_preferences ? JSON.parse(training.user_preferences) : {},
-        plan: {} // ✅ CAMPO NOVO: só os dias necessários
+        id: savedTraining.id,
+        user_id: savedTraining.user_id,
+        diasSemana: savedTraining.dias_semana,
+        current_day: savedTraining.current_day,
+        generated_at: savedTraining.generated_at,
+        ai_model: savedTraining.ai_model,
+        user_preferences: savedTraining.user_preferences || {},
+        plan: {}
       },
       metadata: {
         executionTime: `${Date.now() - startTime}ms`,
@@ -229,15 +190,15 @@ export async function POST(request) {
       }
     };
 
-    // Preencher apenas os dias até diasSemana
-    for (let dia = 1; dia <= training.diasSemana; dia++) {
+    // Preencher apenas os dias necessários
+    for (let dia = 1; dia <= savedTraining.dias_semana; dia++) {
       const dayField = `day${dia}_exercises`;
-      response.training.plan[dia] = training[dayField] ? JSON.parse(training[dayField]) : [];
+      response.training.plan[dia] = savedTraining[dayField] || [];
     }
 
     const executionTime = Date.now() - startTime;
     console.log(`[TRAINING-GENERATE] ✅ TREINO GERADO COM SUCESSO (${executionTime}ms)`);
-    console.log(`[TRAINING-GENERATE] Gerado ${training.diasSemana} dias de treino`);
+    console.log(`[TRAINING-GENERATE] Gerado ${savedTraining.dias_semana} dias de treino`);
     console.log('[TRAINING-GENERATE] ========== FIM DA GERAÇÃO ==========\n');
 
     return Response.json(response, { status: 201 });

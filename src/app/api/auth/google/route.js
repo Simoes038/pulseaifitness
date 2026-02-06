@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { dbGet, dbRun } from "@/lib/db";  // ✅ IMPORTAÇÃO CORRETA
+import { supabaseAdmin } from "@/lib/supabase";
 
 export async function POST(request) {
   try {
@@ -15,43 +15,73 @@ export async function POST(request) {
 
     console.log("🔍 [GOOGLE] Buscando usuário:", mockEmail);
 
-    // ✅ 1. BUSCAR USUÁRIO (COM AWAIT!)
-    let user = await dbGet(
-      "SELECT id, email, full_name FROM users WHERE email = ?",
-      [mockEmail]
-    );
+    // ✅ 1. BUSCAR USUÁRIO NO SUPABASE
+    const { data: user, error: fetchError } = await supabaseAdmin
+      .from("users")
+      .select("id, email, full_name")
+      .eq("email", mockEmail)
+      .single();
 
-    // ✅ 2. SE NÃO EXISTE, CRIAR (COM AWAIT!)
-    if (!user) {
+    let finalUser = user;
+
+    // ✅ 2. SE NÃO EXISTE, CRIAR
+    if (fetchError && fetchError.code === 'PGRST116') {
       console.log("🆕 [GOOGLE] Criando usuário...");
       
-      const result = await dbRun(
-        "INSERT INTO users (email, password_hash, full_name, created_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
-        [mockEmail, 'GOOGLE_OAUTH', mockName]
-      );
+      const { data: newUser, error: insertError } = await supabaseAdmin
+        .from("users")
+        .insert({
+          email: mockEmail,
+          password_hash: 'GOOGLE_OAUTH',
+          full_name: mockName,
+          created_at: new Date().toISOString(),
+          last_login: new Date().toISOString(),
+        })
+        .select()
+        .single();
 
-      // Buscar usuário recém-criado
-      user = await dbGet("SELECT id, email, full_name FROM users WHERE id = ?", [result.id]);
-      console.log("✅ [GOOGLE] Usuário criado:", user.id);
+      if (insertError) {
+        console.error("❌ [GOOGLE] Erro ao criar usuário:", insertError);
+        return Response.json(
+          { error: "Erro ao criar usuário" },
+          { status: 500 }
+        );
+      }
+
+      finalUser = newUser;
+      console.log("✅ [GOOGLE] Usuário criado:", finalUser.id);
+    } else if (fetchError) {
+      // Outro erro que não seja "not found"
+      console.error("❌ [GOOGLE] Erro ao buscar usuário:", fetchError);
+      return Response.json(
+        { error: "Erro ao buscar usuário" },
+        { status: 500 }
+      );
     } else {
-      console.log("✅ [GOOGLE] Usuário encontrado:", user.id);
+      console.log("✅ [GOOGLE] Usuário encontrado:", finalUser.id);
+      
+      // Atualizar last_login
+      await supabaseAdmin
+        .from("users")
+        .update({ last_login: new Date().toISOString() })
+        .eq("id", finalUser.id);
     }
 
     // ✅ 3. GERAR TOKEN JWT
     const jwtToken = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: finalUser.id, email: finalUser.email },
       process.env.JWT_SECRET || "secret-super-seguro-dev",
       { expiresIn: "24h" }
     );
 
-    console.log("🎉 [GOOGLE] Login bem-sucedido:", user.email);
+    console.log("🎉 [GOOGLE] Login bem-sucedido:", finalUser.email);
 
     return Response.json({
       success: true,
       user: { 
-        id: user.id, 
-        email: user.email, 
-        fullName: user.full_name 
+        id: finalUser.id, 
+        email: finalUser.email, 
+        fullName: finalUser.full_name 
       },
       token: jwtToken,
     }, { status: 200 });
